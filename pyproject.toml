@@ -1,0 +1,13 @@
+[project]
+name = "dspy-baml-experiments"
+version = "0.1.0"
+description = "Experiments comparing DSPy and BAML for similar tasks"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dspy>=3.0.0b3",
+    "litellm[proxy]>=1.75.2",
+    "polars>=1.31.0",
+    "pyarrow>=21.0.0",
+    "python-dotenv>=1.1.1",
+]
