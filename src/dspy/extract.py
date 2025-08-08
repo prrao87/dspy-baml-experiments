@@ -20,7 +20,7 @@ lm = dspy.LM(
     api_key=os.environ["OPENROUTER_API_KEY"],
     max_tokens=20_000,  # Max output tokens
 )
-dspy.configure(lm=lm, adapter=BAMLAdapter())
+dspy.configure(lm=lm)
 
 
 class PatientNote(BaseModel):
@@ -134,7 +134,7 @@ class ExtractData(dspy.Module):
         r1 = await self.extract_patient.acall(note=note["note"])
         r1.patient.record_id = note["record_id"]
         r1 = r1.patient.model_dump()
-        print(dspy.inspect_history(n=1))
+        # print(dspy.inspect_history(n=1))
 
         r2 = await self.extract_practitioner.acall(note=note["note"])
         r2 = [item.model_dump() for item in r2.practitioner] if r2.practitioner else None
