@@ -208,3 +208,5 @@ __marimo__/
 
 # Extra
 .DS_Store
+baml_client
+structured_output_*.json
