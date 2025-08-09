@@ -58,7 +58,7 @@ class Allergy {
 // --- Functions ---
 
 function ExtractPatient(record: string) -> Patient {
-  client OpenRouterGoogleGemini2Flash
+  client OpenRouterGPT41Nano
   prompt #"
     Extract the patient information from the given note.
     - Do not infer any information that is not explicitly mentioned in the text.
@@ -73,7 +73,7 @@ function ExtractPatient(record: string) -> Patient {
 }
 
 function ExtractPractitioner(record: string) -> Practitioner[] {
-  client OpenRouterGoogleGemini2Flash
+  client OpenRouterGPT41Nano
   prompt #"
     Extract practitioner & healthcare provider information from the given note.
     - Do not infer any information that is not explicitly mentioned in the text.
@@ -88,7 +88,7 @@ function ExtractPractitioner(record: string) -> Practitioner[] {
 }
 
 function ExtractImmunization(record: string) -> Immunization[] {
-  client OpenRouterGoogleGemini2Flash
+  client OpenRouterGPT41Nano
   prompt #"
     Extract immunization information from the given note.
     - Do not infer any information that is not explicitly mentioned in the text.

@@ -11,7 +11,7 @@ uv run extract.py -e 200
 uv run extract.py
 ```
 
-The results are saved to `data/structured_output.json`.
+The results are saved to `data/structured_output_dspy.json`.
 
 ## JSON schema vs. BAML adapter
 
@@ -46,15 +46,19 @@ Experiments were run for several LMs, with and without the BAML adapter. The num
 the percentage of total exact matches from the evaluation script, comparing the structured outputs
 against the gold standard. It's clear that the BAML adapter significantly improves the results across all models.
 
-| Model | JSON schema | BAML Adapter |
-|-------|---------------------|-------------------|
-| mistralai/mistral-small-3.2-24b-instruct | 90.0% | 91.0% |
-| google/gemma-3-27b-it | 88.9% | 94.4% |
-| google/gemini-2.0-flash-001 | 90.1% | 94.9% |
-| openai/gpt-4.1-mini | 93.8% | 95.3% |
-| google/gemini-2.5-flash | 90.6% | 95.4% |
+| Model | BAML | DSPy w/ JSON schema | DSPy w/ BAML Adapter |
+|-------|---|-------------------:|-------------------:|
+| `google/gemma-3-27b-it` | 90.9% | 88.9% | 94.4% |
+| `google/gemini-2.0-flash-001` | 94.7% | 90.2% | 95.5% |
+| `openai/gpt-4.1-nano`| 83.7% | 83.5% | 84.2% |
+| `openai/gpt-4.1-mini`| 95.6% | 94.7% | 94.2% |
+| `google/gemini-2.5-flash` | 95.3% | 90.6% | 95.5% |
 
-The performance gains from using the BAML adapter come for *free* - all it does is translate
+BAML performs better than DSPy (default, which uses JSON schema). However, when we pass
+use the `BAMLAdapter` in DSPy to pass in the BAML schema format to DSPy's generated prompt,
+we see DSPy's performance on par with BAML's on most counts.
+
+The performance gains from using the BAML adapter in DSPy come for *free* - all it does is translate
 the nested Pydantic types from the signature to a more token-efficient and concise schema representation,
 which is then passed to the auto-generated prompt to the LM. This allows the LM to focus on the schema at
 hand and adhere to it during generation.
@@ -120,39 +124,39 @@ Patient Fields:
   patient.address.line -> 108/124 (87.1%) [mismatches: [24, 39, 41, 75, 85, 90, 97, 103, 115, 129]]
   patient.address.postalCode -> 108/124 (87.1%) [mismatches: [8, 24, 28, 33, 34, 39, 100, 116, 129, 141]]
   patient.address.state -> 118/124 (95.2%) [mismatches: [24, 129, 150, 168, 172, 197]]
-  patient.age -> 197/199 (99.0%) [mismatches: [128, 182]]
+  patient.age -> 193/199 (97.0%) [mismatches: [59, 66, 81, 112, 128, 182]]
   patient.birthDate -> 197/199 (99.0%) [mismatches: [169, 179]]
   patient.email -> 199/199 (100.0%)
-  patient.gender -> 181/199 (91.0%) [mismatches: [44, 49, 56, 58, 72, 79, 89, 99, 103, 106]]
+  patient.gender -> 172/199 (86.4%) [mismatches: [2, 17, 20, 33, 44, 45, 46, 49, 56, 58]]
   patient.maritalStatus -> 194/199 (97.5%) [mismatches: [64, 100, 103, 174, 182]]
-  patient.name.family -> 195/199 (98.0%) [mismatches: [29, 45, 97, 190]]
-  patient.name.given -> 194/199 (97.5%) [mismatches: [29, 42, 75, 129, 190]]
-  patient.name.prefix -> 190/199 (95.5%) [mismatches: [13, 15, 28, 37, 80, 123, 125, 126, 141]]
-  patient.phone -> 199/199 (100.0%)
+  patient.name.family -> 196/199 (98.5%) [mismatches: [45, 97, 180]]
+  patient.name.given -> 197/199 (99.0%) [mismatches: [129, 180]]
+  patient.name.prefix -> 193/199 (97.0%) [mismatches: [13, 15, 37, 80, 106, 141]]
+  patient.phone -> 198/199 (99.5%) [mismatches: [150]]
 
 Practitioner Fields:
-  practitioner.address.city -> 34/38 (89.5%) [mismatches: [52, 141, 166, 187]]
-  practitioner.address.country -> 33/38 (86.8%) [mismatches: [52, 91, 141, 166, 187]]
-  practitioner.address.line -> 50/73 (68.5%) [mismatches: [14, 20, 25, 28, 29, 33, 44, 45, 47, 52]]
-  practitioner.address.postalCode -> 32/38 (84.2%) [mismatches: [34, 52, 117, 138, 139, 166]]
-  practitioner.address.state -> 35/38 (92.1%) [mismatches: [52, 141, 166]]
-  practitioner.email -> 72/73 (98.6%) [mismatches: [138]]
-  practitioner.name.family -> 70/73 (95.9%) [mismatches: [138, 150, 166]]
-  practitioner.name.given -> 50/73 (68.5%) [mismatches: [17, 25, 28, 29, 45, 47, 50, 60, 81, 88]]
-  practitioner.name.prefix -> 70/73 (95.9%) [mismatches: [138, 150, 166]]
-  practitioner.phone -> 70/73 (95.9%) [mismatches: [52, 150, 166]]
+  practitioner.address.city -> 35/37 (94.6%) [mismatches: [166, 187]]
+  practitioner.address.country -> 35/37 (94.6%) [mismatches: [166, 187]]
+  practitioner.address.line -> 51/72 (70.8%) [mismatches: [14, 20, 25, 28, 29, 33, 44, 45, 47, 63]]
+  practitioner.address.postalCode -> 32/37 (86.5%) [mismatches: [34, 117, 138, 139, 166]]
+  practitioner.address.state -> 36/37 (97.3%) [mismatches: [166]]
+  practitioner.email -> 71/72 (98.6%) [mismatches: [138]]
+  practitioner.name.family -> 70/72 (97.2%) [mismatches: [138, 166]]
+  practitioner.name.given -> 70/72 (97.2%) [mismatches: [138, 166]]
+  practitioner.name.prefix -> 70/72 (97.2%) [mismatches: [138, 166]]
+  practitioner.phone -> 69/72 (95.8%) [mismatches: [52, 150, 166]]
 
 Practitioner Count Fields:
-  practitioner.count -> 190/199 (95.5%) [mismatches: [23, 68, 73, 93, 140, 150, 165, 172, 196]]
+  practitioner.count -> 189/199 (95.0%) [mismatches: [23, 66, 68, 73, 140, 158, 165, 172, 196, 197]]
 
 Immunization Fields:
-  immunization.count -> 196/199 (98.5%) [mismatches: [14, 77, 162]]
+  immunization.count -> 195/199 (98.0%) [mismatches: [14, 77, 138, 162]]
 
 Allergy Fields:
   allergy.count -> 197/199 (99.0%) [mismatches: [45, 195]]
 
 === Overall Statistics ===
-Total Fields Evaluated: 3598
-Total Matches: 3413
-Overall Accuracy: 94.9%
+Total Fields Evaluated: 3588
+Total Matches: 3427
+Overall Accuracy: 95.5%
 ```

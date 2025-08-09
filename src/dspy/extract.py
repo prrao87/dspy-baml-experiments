@@ -15,7 +15,7 @@ load_dotenv()
 
 # Using OpenRouter. Switch to another LLM provider as needed
 lm = dspy.LM(
-    model="openrouter/mistralai/mistral-small-3.2-24b-instruct",
+    model="openrouter/openai/gpt-4.1-mini",
     api_base="https://openrouter.ai/api/v1",
     api_key=os.environ["OPENROUTER_API_KEY"],
     max_tokens=10_000,  # Max output tokens
@@ -233,7 +233,7 @@ if __name__ == "__main__":
     # Collect input data
     df = pl.read_json(args.fname)
     notes = df.to_dicts()
-    notes = notes[args.start - 1 : args.end - 1]  # Adjust for zero-based indexing
+    notes = notes[args.start - 1 : args.end]  # Adjust for zero-based indexing
 
     print(f"Processing {len(notes)} notes...")
     # Run async extraction

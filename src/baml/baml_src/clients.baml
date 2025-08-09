@@ -14,6 +14,20 @@ client<llm> OpenRouterGPT4oMini {
   }
 }
 
+client<llm> OpenRouterGPT41Mini {
+  provider "openai-generic"
+  options {
+    base_url "https://openrouter.ai/api/v1"
+    api_key env.OPENROUTER_API_KEY
+    model "openai/gpt-4.1-mini"
+    temperature 0.0
+    headers {
+      "HTTP-Referer" "https://kuzudb.com" // Optional
+      "X-Title" "Graph RAG" // Optional
+    }
+  }
+}
+
 client<llm> OpenRouterGPT41Nano {
   provider "openai-generic"
   options {
@@ -28,26 +42,12 @@ client<llm> OpenRouterGPT41Nano {
   }
 }
 
-client<llm> OpenRouterGPT41 {
+client<llm> OpenRouterGemma3_27b {
   provider "openai-generic"
   options {
     base_url "https://openrouter.ai/api/v1"
     api_key env.OPENROUTER_API_KEY
-    model "openai/gpt-4.1-2025-04-14"
-    temperature 0.0
-    headers {
-      "HTTP-Referer" "https://kuzudb.com" // Optional
-      "X-Title" "Graph RAG" // Optional
-    }
-  }
-}
-
-client<llm> OpenRouterGoogleGemini25FlashLite {
-  provider "openai-generic"
-  options {
-    base_url "https://openrouter.ai/api/v1"
-    api_key env.OPENROUTER_API_KEY
-    model "google/gemini-2.5-flash-lite-preview-06-17"
+    model "google/gemma-3-27b-it"
     temperature 0.0
     headers {
       "HTTP-Referer" "https://kuzudb.com" // Optional
@@ -85,13 +85,13 @@ client<llm> OpenRouterGoogleGemini2Flash {
   }
 }
 
-client<llm> OpenRouterGoogleGemini2FlashGenerate {
+client<llm> OpenRouterMistralDevstralMedium {
   provider "openai-generic"
   options {
     base_url "https://openrouter.ai/api/v1"
     api_key env.OPENROUTER_API_KEY
-    model "google/gemini-2.0-flash-001"
-    temperature 0.2
+    model "mistralai/devstral-medium"
+    temperature 0.0
     headers {
       "HTTP-Referer" "https://kuzudb.com" // Optional
       "X-Title" "Graph RAG" // Optional
@@ -107,7 +107,7 @@ client<llm> OllamaLlama3 {
   }
 }
 
-client<llm> OllamaGemme3_12b {
+client<llm> OllamaGemma3_12b {
   provider "openai-generic"
   options {
     base_url "http://localhost:11434/v1"

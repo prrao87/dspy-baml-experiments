@@ -1,3 +1,8 @@
+"""
+Custom adapter for improving structured outputs using the information from Pydantic models.
+Based on the format used by BAML: https://github.com/BoundaryML/baml
+"""
+
 import inspect
 import types
 from typing import Any, Literal, Union, get_args, get_origin
@@ -197,9 +202,8 @@ class BAMLAdapter(JSONAdapter):
     ```
     """
 
-    def format_field_structure(self, signature: type[Signature]) -> str:
-        """Overrides the base method to generate a simplified schema for Pydantic models."""
-
+    def format_field_description(self, signature: type[Signature]) -> str:
+        """Format the field description for the system message."""
         sections = []
 
         # Add input field descriptions
@@ -218,6 +222,13 @@ class BAMLAdapter(JSONAdapter):
                 description = f": {field.description}" if field.description else ":"
                 sections.append(f"{i}. `{name}` ({type_name}){description}")
 
+        return "\n".join(sections)
+
+    def format_field_structure(self, signature: type[Signature]) -> str:
+        """Overrides the base method to generate a simplified schema for Pydantic models."""
+
+        sections = []
+
         # Add structural explanation
         sections.append(
             "All interactions will be structured in the following way, with the appropriate values filled in.\n"
@@ -225,9 +236,6 @@ class BAMLAdapter(JSONAdapter):
 
         # Add input structure section
         if signature.input_fields:
-            sections.append("Inputs will have the following structure:")
-            sections.append("")  # Empty line
-
             for name in signature.input_fields.keys():
                 sections.append(f"[[ ## {name} ## ]]")
                 sections.append(f"{{{name}}}")
@@ -235,9 +243,6 @@ class BAMLAdapter(JSONAdapter):
 
         # Add output structure section
         if signature.output_fields:
-            sections.append("Outputs will be a JSON object with the following fields.")
-            sections.append("")  # Empty line
-
             for name, field in signature.output_fields.items():
                 field_type = field.annotation
                 main_type = field_type
@@ -249,6 +254,8 @@ class BAMLAdapter(JSONAdapter):
                     if len(non_none_args) == 1:
                         main_type = non_none_args[0]
 
+                sections.append(f"[[ ## {name} ## ]]")
+
                 if inspect.isclass(main_type) and issubclass(main_type, BaseModel):
                     # We have a pydantic model, so build the simplified schema for it.
                     schema_str = _build_simplified_schema(main_type)
@@ -258,7 +265,20 @@ class BAMLAdapter(JSONAdapter):
                     type_str = _render_type_str(field_type, indent=0)
                     sections.append(f"Output field `{name}` should be of type: {type_str}")
 
+                sections.append("")  # Empty line after each output
+
+        # Add completed section
+        sections.append("[[ ## completed ## ]]")
+
         return "\n".join(sections)
+
+    def format_task_description(self, signature: type[Signature]) -> str:
+        """Format the task description for the system message."""
+        import textwrap
+
+        instructions = textwrap.dedent(signature.instructions)
+        objective = ("\n" + " " * 8).join([""] + instructions.splitlines())
+        return f"In adhering to this structure, your objective is: {objective}"
 
     def format_user_message_content(
         self,
