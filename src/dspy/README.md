@@ -54,8 +54,7 @@ against the gold standard. It's clear that the BAML adapter significantly improv
 | `openai/gpt-4.1-mini`| 95.6% | 94.7% | 94.2% |
 | `google/gemini-2.5-flash` | 95.3% | 90.6% | 95.5% |
 
-BAML performs better than DSPy (default, which uses JSON schema). However, when we pass
-use the `BAMLAdapter` in DSPy to pass in the BAML schema format to DSPy's generated prompt,
+BAML performs better than DSPy (default, which uses JSON schema). However, when we use the `BAMLAdapter` in DSPy to format the schema in the BAML format (which is then used in DSPy's generated prompt),
 we see DSPy's performance on par with BAML's on most counts.
 
 The performance gains from using the BAML adapter in DSPy come for *free* - all it does is translate
