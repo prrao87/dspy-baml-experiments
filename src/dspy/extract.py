@@ -4,18 +4,18 @@ import json
 import os
 from typing import Any, Literal
 
+import dspy
 import polars as pl
-from baml_adapter import BAMLAdapter
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-import dspy
+from baml_adapter import BAMLAdapter
 
 load_dotenv()
 
 # Using OpenRouter. Switch to another LLM provider as needed
 lm = dspy.LM(
-    model="openrouter/google/gemma-3-4b-it",
+    model="openrouter/google/gemini-2.0-flash-001",
     api_base="https://openrouter.ai/api/v1",
     api_key=os.environ["OPENROUTER_API_KEY"],
     max_tokens=10_000,  # Max output tokens
@@ -49,15 +49,9 @@ class Address(BaseModel):
 
 class Practitioner(BaseModel):
     name: PersonNameAndTitle | None
-    phone: str | None = Field(
-        default=None, description="Phone number of the healthcare provider"
-    )
-    email: str | None = Field(
-        default=None, description="Email address of the healthcare provider"
-    )
-    address: Address | None = Field(
-        default=None, description="Address of the healthcare provider"
-    )
+    phone: str | None = Field(default=None, description="Phone number of the healthcare provider")
+    email: str | None = Field(default=None, description="Email address of the healthcare provider")
+    address: Address | None = Field(default=None, description="Address of the healthcare provider")
 
 
 class Immunization(BaseModel):
@@ -69,9 +63,7 @@ class Immunization(BaseModel):
         default=None,
         description="If no traits are present, then the status cannot be determined",
     )
-    occurrenceDate: str | None = Field(
-        default=None, description="ISO-8601 format for date"
-    )
+    occurrenceDate: str | None = Field(default=None, description="ISO-8601 format for date")
 
 
 class Substance(BaseModel):
@@ -84,9 +76,7 @@ class Substance(BaseModel):
 
 
 class Allergy(BaseModel):
-    substance: list[Substance] = Field(
-        description="Substances the patient is allergic to"
-    )
+    substance: list[Substance] = Field(description="Substances the patient is allergic to")
 
 
 class Patient(BaseModel):
@@ -98,9 +88,7 @@ class Patient(BaseModel):
     phone: str | None = Field(default=None, description="Phone number of the patient")
     email: str | None = Field(default=None, description="Email address of the patient")
     maritalStatus: Literal["Married", "Divorced", "Widowed", "NeverMarried"] | None
-    address: Address | None = Field(
-        default=None, description="Residence address of the patient"
-    )
+    address: Address | None = Field(default=None, description="Residence address of the patient")
     allergy: list[Allergy] | None = Field(default=None)
 
 
@@ -129,7 +117,7 @@ class ImmunizationInfo(dspy.Signature):
     Extracts immunization information from a patient note.
     """
 
-    note: PatientNote = dspy.InputField()
+    note: PatientNote = dspy.InputField(desc="Immunization info only")
     immunization: list[Immunization] | None = dspy.OutputField()
 
 
@@ -153,12 +141,8 @@ class ExtractData(dspy.Module):
         # Process results
         r1.patient.record_id = note["record_id"]
         r1 = r1.patient.model_dump()
-        r2 = (
-            [item.model_dump() for item in r2.practitioner] if r2.practitioner else None
-        )
-        r3 = (
-            [item.model_dump() for item in r3.immunization] if r3.immunization else None
-        )
+        r2 = [item.model_dump() for item in r2.practitioner] if r2.practitioner else None
+        r3 = [item.model_dump() for item in r3.immunization] if r3.immunization else None
         # Combine the results into a dictionary
         result = {"patient": r1, "practitioner": r2, "immunization": r3}
         return result
@@ -173,13 +157,9 @@ class ExtractData(dspy.Module):
         r1 = r1.patient.model_dump()
 
         r2 = self.extract_practitioner(note=note["note"])
-        r2 = (
-            [item.model_dump() for item in r2.practitioner] if r2.practitioner else None
-        )
+        r2 = [item.model_dump() for item in r2.practitioner] if r2.practitioner else None
         r3 = self.extract_immunization(note=note["note"])
-        r3 = (
-            [item.model_dump() for item in r3.immunization] if r3.immunization else None
-        )
+        r3 = [item.model_dump() for item in r3.immunization] if r3.immunization else None
         # Combine the results into a dictionary
         result = {"patient": r1, "practitioner": r2, "immunization": r3}
         return result
@@ -226,14 +206,18 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if args.start < 1 or args.start > args.end:
-        raise ValueError(
-            "Start index must be greater than 1 and less than or equal to end index."
-        )
+        raise ValueError("Start index must be greater than 1 and less than or equal to end index.")
 
     # Collect input data
     df = pl.read_json(args.fname)
     notes = df.to_dicts()
     notes = notes[args.start - 1 : args.end]  # Adjust for zero-based indexing
+
+    # # Debug
+    # extract_patient = ExtractData()
+    # for note in notes:
+    #     print(extract_patient(note))
+    #     print(dspy.inspect_history(n=3))
 
     print(f"Processing {len(notes)} notes...")
     # Run async extraction
@@ -242,6 +226,4 @@ if __name__ == "__main__":
     with open(args.output_file, "w") as f:
         for i, (note, patient_info) in enumerate(zip(notes, extracted_results)):
             f.write(f"{json.dumps(patient_info)}\n")
-    print(
-        f"\nCompleted processing {len(extracted_results)} notes and saved to {args.output_file}"
-    )
+    print(f"\nCompleted processing {len(extracted_results)} notes and saved to {args.output_file}")

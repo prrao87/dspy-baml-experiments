@@ -59,9 +59,7 @@ STATE_ABBR_TO_NAME = {
 }
 
 
-def load_and_match_records(
-    gold_path: Path, result_path: Path
-) -> List[Tuple[Dict, Dict]]:
+def load_and_match_records(gold_path: Path, result_path: Path) -> List[Tuple[Dict, Dict]]:
     """Load JSON files and match records by record_id."""
     with open(gold_path, "r") as f:
         gold_data = json.load(f)
@@ -92,9 +90,7 @@ class FieldCounter:
         self.counters = defaultdict(lambda: [0, 0])  # [matches, total]
         self.mismatches = defaultdict(list)  # record_ids where field mismatched
 
-    def add_comparison(
-        self, field_name: str, is_match: bool, record_id: int | None = None
-    ):
+    def add_comparison(self, field_name: str, is_match: bool, record_id: int | None = None):
         """Add a field comparison result."""
         self.counters[field_name][1] += 1  # total
         if is_match:
@@ -238,9 +234,7 @@ def compare_values(val1: Any, val2: Any, field_name: str = "") -> bool:
     return str(val1).lower().strip() == str(val2).lower().strip()
 
 
-def evaluate_patient_fields(
-    gold_record: Dict, result_record: Dict, counter: FieldCounter
-):
+def evaluate_patient_fields(gold_record: Dict, result_record: Dict, counter: FieldCounter):
     """Evaluate patient-level fields."""
     result_patient = result_record.get("patient", {})
     record_id = gold_record.get("record_id")
@@ -282,15 +276,11 @@ def evaluate_patient_fields(
             for field in addr_fields:
                 gold_val = gold_addr.get(field) if gold_addr else None
                 result_val = result_addr.get(field) if result_addr else None
-                is_match = compare_values(
-                    gold_val, result_val, f"patient.address.{field}"
-                )
+                is_match = compare_values(gold_val, result_val, f"patient.address.{field}")
                 counter.add_comparison(f"patient.address.{field}", is_match, record_id)
 
 
-def evaluate_practitioner_arrays(
-    gold_record: Dict, result_record: Dict, counter: FieldCounter
-):
+def evaluate_practitioner_arrays(gold_record: Dict, result_record: Dict, counter: FieldCounter):
     """Evaluate practitioner arrays with null checks."""
     gold_practitioners = gold_record.get("practitioner")
     result_practitioners = result_record.get("practitioner")
@@ -333,9 +323,7 @@ def evaluate_practitioner_arrays(
 
         # Compare address line sets
         address_lines_match = gold_address_lines == result_address_lines
-        counter.add_comparison(
-            "practitioner.address.line", address_lines_match, record_id
-        )
+        counter.add_comparison("practitioner.address.line", address_lines_match, record_id)
 
         # For other fields, use first practitioner comparison (simpler approach)
         gold_prac = gold_practitioners[0]
@@ -348,9 +336,7 @@ def evaluate_practitioner_arrays(
         for field in name_fields:
             gold_val = gold_name.get(field) if gold_name else None
             result_val = result_name.get(field) if result_name else None
-            is_match = compare_values(
-                gold_val, result_val, f"practitioner.name.{field}"
-            )
+            is_match = compare_values(gold_val, result_val, f"practitioner.name.{field}")
             counter.add_comparison(f"practitioner.name.{field}", is_match, record_id)
 
         # Direct practitioner fields
@@ -369,17 +355,11 @@ def evaluate_practitioner_arrays(
             for field in addr_fields:
                 gold_val = gold_addr.get(field) if gold_addr else None
                 result_val = result_addr.get(field) if result_addr else None
-                is_match = compare_values(
-                    gold_val, result_val, f"practitioner.address.{field}"
-                )
-                counter.add_comparison(
-                    f"practitioner.address.{field}", is_match, record_id
-                )
+                is_match = compare_values(gold_val, result_val, f"practitioner.address.{field}")
+                counter.add_comparison(f"practitioner.address.{field}", is_match, record_id)
 
 
-def evaluate_practitioner_count(
-    gold_record: Dict, result_record: Dict, counter: FieldCounter
-):
+def evaluate_practitioner_count(gold_record: Dict, result_record: Dict, counter: FieldCounter):
     """Evaluate practitioner count matching."""
     gold_practitioners = gold_record.get("practitioner")
     result_practitioners = result_record.get("practitioner")
@@ -393,9 +373,7 @@ def evaluate_practitioner_count(
     counter.add_comparison("practitioner.count", is_count_match, record_id)
 
 
-def evaluate_immunization_arrays(
-    gold_record: Dict, result_record: Dict, counter: FieldCounter
-):
+def evaluate_immunization_arrays(gold_record: Dict, result_record: Dict, counter: FieldCounter):
     """Evaluate immunization arrays using count matching."""
     gold_immunizations = gold_record.get("immunization")
     result_immunizations = result_record.get("immunization")
@@ -409,9 +387,7 @@ def evaluate_immunization_arrays(
     counter.add_comparison("immunization.count", is_count_match, record_id)
 
 
-def evaluate_allergy_data(
-    gold_record: Dict, result_record: Dict, counter: FieldCounter
-):
+def evaluate_allergy_data(gold_record: Dict, result_record: Dict, counter: FieldCounter):
     """Evaluate allergy data handling structural differences."""
     gold_allergy = gold_record.get("allergy", {})
     result_allergy = result_record.get("patient", {}).get("allergy", [])
@@ -454,16 +430,10 @@ def generate_evaluation_report(counter: FieldCounter) -> str:
     categories = {
         "Patient Fields": [k for k in results.keys() if k.startswith("patient.")],
         "Practitioner Fields": [
-            k
-            for k in results.keys()
-            if k.startswith("practitioner.") and k != "practitioner.count"
+            k for k in results.keys() if k.startswith("practitioner.") and k != "practitioner.count"
         ],
-        "Practitioner Count Fields": [
-            k for k in results.keys() if k == "practitioner.count"
-        ],
-        "Immunization Fields": [
-            k for k in results.keys() if k.startswith("immunization.")
-        ],
+        "Practitioner Count Fields": [k for k in results.keys() if k == "practitioner.count"],
+        "Immunization Fields": [k for k in results.keys() if k.startswith("immunization.")],
         "Allergy Fields": [k for k in results.keys() if k.startswith("allergy.")],
     }
 
