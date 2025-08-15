@@ -15,7 +15,7 @@ load_dotenv()
 
 # Using OpenRouter. Switch to another LLM provider as needed
 lm = dspy.LM(
-    model="openrouter/openai/gpt-4.1-mini",
+    model="openrouter/google/gemma-3-4b-it",
     api_base="https://openrouter.ai/api/v1",
     api_key=os.environ["OPENROUTER_API_KEY"],
     max_tokens=10_000,  # Max output tokens

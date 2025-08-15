@@ -16,34 +16,45 @@ from baml_client.async_client import b
 
 load_dotenv()
 
+# Rate limiting configuration to avoid overwhelming the API (esp. for smaller/less popular models)
+MAX_CONCURRENT_REQUESTS = 20  # Adjust based on the API limit
+REQUEST_DELAY = 0.01  # Delay between individual API calls in seconds
+
+# Global semaphore to limit concurrent API requests
+api_semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+
 
 async def extract_patient(record: Dict[str, str]) -> Dict[str, Any]:
-    patient = await b.ExtractPatient(record["note"])
-    output = patient.model_dump()
-    # Clean up output
-    output["record_id"] = record["record_id"]
-    output["maritalStatus"] = (
-        output["maritalStatus"].value if output["maritalStatus"] else None
-    )
-    print(f"✓ Extracted patient details for record {record['record_id']}")
-    return output
+    async with api_semaphore:
+        await asyncio.sleep(REQUEST_DELAY)
+        patient = await b.ExtractPatient(record["note"])
+        output = patient.model_dump()
+        # Clean up output
+        output["record_id"] = record["record_id"]
+        output["maritalStatus"] = output["maritalStatus"].value if output["maritalStatus"] else None
+        print(f"✓ Extracted patient details for record {record['record_id']}")
+        return output
 
 
 async def extract_practitioner(record: Dict[str, str]) -> List[Dict[str, Any]]:
-    practitioners = await b.ExtractPractitioner(record["note"])
-    output = [item.model_dump() for item in practitioners]
-    print(f"✓ Extracted practitioner details for record {record['record_id']}")
-    return output
+    async with api_semaphore:
+        await asyncio.sleep(REQUEST_DELAY)
+        practitioners = await b.ExtractPractitioner(record["note"])
+        output = [item.model_dump() for item in practitioners]
+        print(f"✓ Extracted practitioner details for record {record['record_id']}")
+        return output
 
 
 async def extract_immunization(record: Dict[str, str]) -> List[Dict[str, Any]]:
-    immunization = await b.ExtractImmunization(record["note"])
-    output = [i.model_dump() for i in immunization]
-    # Add record_id to each immunization entry for safety
-    for item in output:
-        item["record_id"] = record["record_id"]
-    print(f"✓ Extracted immunization for record {record['record_id']}")
-    return output
+    async with api_semaphore:
+        await asyncio.sleep(REQUEST_DELAY)
+        immunization = await b.ExtractImmunization(record["note"])
+        output = [i.model_dump() for i in immunization]
+        # Add record_id to each immunization entry for safety
+        for item in output:
+            item["record_id"] = record["record_id"]
+        print(f"✓ Extracted immunization for record {record['record_id']}")
+        return output
 
 
 async def process_record(record: Dict[str, str]) -> Dict[str, Any]:
@@ -55,18 +66,14 @@ async def process_record(record: Dict[str, str]) -> Dict[str, Any]:
     ]
 
     try:
-        patient_result, practitioner_result, immunization_result = await asyncio.gather(
-            *tasks
-        )
+        patient_result, practitioner_result, immunization_result = await asyncio.gather(*tasks)
 
         # Create the desired JSON structure
         result = {
             "patient": patient_result,
             "practitioner": practitioner_result
             if practitioner_result
-            and not all(
-                all(v is None for v in item.values()) for item in practitioner_result
-            )
+            and not all(all(v is None for v in item.values()) for item in practitioner_result)
             else None,
             "immunization": immunization_result
             if not all(v is None for v in immunization_result)
@@ -85,8 +92,10 @@ async def process_record(record: Dict[str, str]) -> Dict[str, Any]:
 
 
 async def extract(records: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    print(f"Processing {len(records)} records")
     tasks = [process_record(record) for record in records]
-    return await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks)
+    return results
 
 
 async def main(fname: str, start: int, end: int) -> None:

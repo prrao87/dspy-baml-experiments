@@ -1,4 +1,4 @@
-# Experiments with DSPy and BAML
+# Structured outputs using BAML or DSPy
 
 This repo contains code that runs the same structured output tasks using both DSPy and BAML.
 The goal is not to compare the two frameworks directly, but to explore their capabilities more
@@ -32,18 +32,6 @@ uv sync
 ```
 
 Install any additional Python packages via `uv add <package_name>`.
-
-## Evaluation
-
-The results from the BAML and DSPy runs are output to their respective `data/structured_output_*.json` 
-files. The evaluation script is run as follows:
-
-```bash
-# Indicate that the output file is from BAML
-uv run evaluate.py -o baml
-# # Indicate that the output file is from DSPy
-uv run evaluate.py -o dspy
-```
 
 See the evaluation results in the `./src/baml`  and `./src/dspy` directories for more information.
 

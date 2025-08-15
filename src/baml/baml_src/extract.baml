@@ -58,7 +58,7 @@ class Allergy {
 // --- Functions ---
 
 function ExtractPatient(record: string) -> Patient {
-  client OpenRouterGPT41Nano
+  client OpenRouterGoogleGemini2Flash
   prompt #"
     Extract the patient information from the given note.
     - Do not infer any information that is not explicitly mentioned in the text.
@@ -73,7 +73,7 @@ function ExtractPatient(record: string) -> Patient {
 }
 
 function ExtractPractitioner(record: string) -> Practitioner[] {
-  client OpenRouterGPT41Nano
+  client OpenRouterGoogleGemini2Flash
   prompt #"
     Extract practitioner & healthcare provider information from the given note.
     - Do not infer any information that is not explicitly mentioned in the text.
@@ -88,7 +88,7 @@ function ExtractPractitioner(record: string) -> Practitioner[] {
 }
 
 function ExtractImmunization(record: string) -> Immunization[] {
-  client OpenRouterGPT41Nano
+  client OpenRouterGoogleGemini2Flash
   prompt #"
     Extract immunization information from the given note.
     - Do not infer any information that is not explicitly mentioned in the text.
@@ -180,7 +180,7 @@ test ExtractPractitioner1 {
 test ExtractPractitioner2 {
   functions [ExtractPractitioner]
   args {
-    record #"OpenRouterGPT41Nano
+    record #"
     Ms. Marisol Rodríguez, who was born on December 1, 1995, and resides at her home at 547 Effertz Extension Unit 28, East Longmeadow, Massachusetts, 00000, is never married. She identifies Spanish as her primary language. She can be reached at her home phone number, which is 555-808-5474.\n\nIn the past, Marisol visited the ENCOMPASS HEALTH REHAB HOSPITAL OF WESTERN MASS on December 13, 2013, from 9:15:24 until 9:30:24 in Central European Standard Time for a postnatal visit. During this visit, Dr. Cletus Paucek, a primary performer, was the practitioner managing her care. You may reach out to Dr. Paucek at his work email, which is Cletus494.Paucek755@example.com.\n\nOf note, Marisol has a confirmed low criticality allergy towards shellfish, first noted on June 2, 1997, at 22:15:24 in Central Eastern Standard Time. Reactions to an exposure to shellfish in her case have varied. In some instances, she experiences a moderate eruption of skin. In severe cases, she has experienced anaphylaxis. More often, her symptoms are mild and include itching and coughing. Another noted allergy intolerance is currently active, yet the clinical details are not specified here.\n\nIn conclusion, based on the documented clinical data, Marisol has a history of postnatal follow-ups and confirmed food allergies that need to be managed, particularly regarding shellfish. She has also had encounters with a primary care practitioner, Dr. Paucek, who can be contacted for more in-depth knowledge about her medical history. The active allergy intolerance should also be further investigated for better management.\n\n
     "#
   }
