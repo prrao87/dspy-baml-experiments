@@ -1,3 +1,8 @@
+"""
+Run a DSPy pipeline to extract information from the FHIR unstructured patient notes data
+and outputs the results to newline-delimited JSON files.
+"""
+
 import argparse
 import asyncio
 import json

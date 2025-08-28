@@ -1,8 +1,10 @@
-# Structured outputs using BAML or DSPy
+# Structured outputs
 
-This repo contains code that runs the same structured output tasks using both DSPy and BAML.
-The goal is not to compare the two frameworks directly, but to explore their capabilities more
-deeply and understand the nuanced differences in their approaches.
+Structured output benchmark that compares the results from modern tools like [BAML](https://docs.boundaryml.com/home)
+and [DSPy](https://dspy.ai/). Both DSPy and BAML aim to solve the same problem: help developers build modular, reliable
+AI systems with composable building blocks. However, there are nuanced differences in what
+building blocks they use and how they are implemented. This repo aims to explore some of those and
+study the performance on a benchmark dataset of clinical notes for a structured output extraction task.
 
 ## Dataset
 
