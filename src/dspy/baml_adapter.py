@@ -7,46 +7,30 @@ import inspect
 import types
 from typing import Any, Literal, Union, get_args, get_origin
 
+from pydantic import BaseModel
+
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.signatures.signature import Signature
-from pydantic import BaseModel
 
 # Changing the comment symbol to Python's # rather than other languages' // seems to help
 COMMENT_SYMBOL = "#"
 
 
-def _render_type_str(annotation: Any, _depth: int = 0, indent: int = 0) -> str:
+def _render_type_str(
+    annotation: Any,
+    depth: int = 0,
+    indent: int = 0,
+    seen_models: set[type] | None = None,
+) -> str:
     """Recursively renders a type annotation into a simplified string.
 
     Args:
         annotation: The type annotation to render
-        _depth: Current recursion depth (prevents infinite recursion)
+        depth: Current recursion depth (prevents infinite recursion)
         indent: Current indentation level for nested structures
     """
-    max_depth = 10
-    if _depth > max_depth:  # Prevent excessive recursion
-        return f"<max depth of {max_depth} exceeded>"
-
-    try:
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-    except Exception:
-        return str(annotation)
-
-    # Handle Optional[T] or T | None
-    if origin in (types.UnionType, Union):
-        non_none_args = [arg for arg in args if arg is not type(None)]
-        # Render the non-None part of the union
-        type_render = " or ".join(
-            [_render_type_str(arg, _depth + 1, indent) for arg in non_none_args]
-        )
-        # Add 'or null' if None was part of the union
-        if len(non_none_args) < len(args):
-            return f"{type_render} or null"
-        return type_render
-
-    # Base types
+    # Non-nested types
     if annotation is str:
         return "string"
     if annotation is int:
@@ -55,110 +39,95 @@ def _render_type_str(annotation: Any, _depth: int = 0, indent: int = 0) -> str:
         return "float"
     if annotation is bool:
         return "boolean"
+    if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
+        return _build_simplified_schema(annotation, indent, seen_models)
 
-    # Composite types
+    try:
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+    except Exception:
+        return str(annotation)
+
+    # Optional[T] or T | None
+    if origin in (types.UnionType, Union):
+        non_none_args = [arg for arg in args if arg is not type(None)]
+        # Render the non-None part of the union
+        type_render = " or ".join([_render_type_str(arg, depth + 1, indent) for arg in non_none_args])
+        # Add "or null" if None was part of the union
+        if len(non_none_args) < len(args):
+            return f"{type_render} or null"
+        return type_render
+
+    # Literal[T1, T2, ...]
     if origin is Literal:
         return " or ".join(f'"{arg}"' for arg in args)
+
+    # list[T]
     if origin is list:
         # For Pydantic models in lists, use bracket notation
         inner_type = args[0]
         if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
             # Build inner schema - the Pydantic model inside should use indent level for array contents
-            inner_schema = _build_simplified_schema(inner_type, indent + 1)
+            inner_schema = _build_simplified_schema(inner_type, indent + 1, seen_models)
             # Format with proper bracket notation and indentation
             current_indent = "  " * indent
             return f"[\n{inner_schema}\n{current_indent}]"
         else:
-            return f"{_render_type_str(inner_type, _depth + 1, indent)}[]"
+            return f"{_render_type_str(inner_type, depth + 1, indent)}[]"
+
+    # dict[T1, T2]
     if origin is dict:
-        return f"dict[{_render_type_str(args[0], _depth + 1, indent)}, {_render_type_str(args[1], _depth + 1, indent)}]"
+        return f"dict[{_render_type_str(args[0], depth + 1, indent)}, {_render_type_str(args[1], depth + 1, indent)}]"
 
-    # Pydantic models (we'll recurse in the main function)
-    if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
-        try:
-            return _build_simplified_schema(annotation, indent)
-        except Exception:
-            return f"<{annotation.__name__}>"
-
-    # Fallback
+    # fallback
     if hasattr(annotation, "__name__"):
         return annotation.__name__
     return str(annotation)
 
 
 def _build_simplified_schema(
-    model: type[BaseModel], indent: int = 0, _seen: set[type] | None = None
+    pydantic_model: type[BaseModel],
+    indent: int = 0,
+    seen_models: set[type] | None = None,
 ) -> str:
     """Builds a simplified, human-readable schema from a Pydantic model.
 
     Args:
-        model: The Pydantic model to build schema for
+        pydantic_model: The Pydantic model to build schema for
         indent: Current indentation level
-        _seen: Set to track visited models (prevents infinite recursion)
+        seen_models: Set to track visited pydantic models (prevents infinite recursion)
     """
-    if _seen is None:
-        _seen = set()
+    seen_models = seen_models or set()
 
-    if model in _seen:
-        return f"<circular reference to {model.__name__}>"
+    if pydantic_model in seen_models:
+        raise ValueError("BAMLAdapter cannot handle recursive pydantic models, please use a different adapter.")
 
-    _seen.add(model)
+    # Add `pydantic_model` to `seen_models` with a placeholder value to avoid infinite recursion.
+    seen_models.add(pydantic_model)
 
-    try:
-        lines = []
-        current_indent = "  " * indent
-        next_indent = "  " * (indent + 1)
+    lines = []
+    current_indent = "  " * indent
+    next_indent = "  " * (indent + 1)
 
-        lines.append(f"{current_indent}{{")
+    lines.append(f"{current_indent}{{")
 
-        fields = model.model_fields
-        if not fields:
-            lines.append(f"{next_indent}{COMMENT_SYMBOL} No fields defined")
-        for name, field in fields.items():
-            if field.description:
-                lines.append(f"{next_indent}{COMMENT_SYMBOL} {field.description}")
-            elif field.alias and field.alias != name:
-                # If there's an alias but no description, show the alias as a comment
-                lines.append(f"{next_indent}{COMMENT_SYMBOL} alias: {field.alias}")
+    fields = pydantic_model.model_fields
+    if not fields:
+        lines.append(f"{next_indent}{COMMENT_SYMBOL} No fields defined")
+    for name, field in fields.items():
+        if field.description:
+            lines.append(f"{next_indent}{COMMENT_SYMBOL} {field.description}")
+        elif field.alias and field.alias != name:
+            # If there's an alias but no description, show the alias as a comment
+            lines.append(f"{next_indent}{COMMENT_SYMBOL} alias: {field.alias}")
 
-            # Check for a nested Pydantic model
-            field_type_to_render = field.annotation
+        rendered_type = _render_type_str(field.annotation, indent=indent + 1, seen_models=seen_models)
+        line = f"{next_indent}{name}: {rendered_type},"
 
-            # Unpack Optional[T] to get T
-            origin = get_origin(field_type_to_render)
-            if origin in (types.UnionType, Union):
-                non_none_args = [
-                    arg for arg in get_args(field_type_to_render) if arg is not type(None)
-                ]
-                if len(non_none_args) == 1:
-                    field_type_to_render = non_none_args[0]
+        lines.append(line)
 
-            # Unpack list[T] to get T
-            origin = get_origin(field_type_to_render)
-            if origin is list:
-                field_type_to_render = get_args(field_type_to_render)[0]
-
-            if inspect.isclass(field_type_to_render) and issubclass(
-                field_type_to_render, BaseModel
-            ):
-                # Recursively build schema for nested models with circular reference protection
-                nested_schema = _build_simplified_schema(field_type_to_render, indent + 1, _seen)
-                rendered_type = _render_type_str(field.annotation, indent=indent + 1).replace(
-                    field_type_to_render.__name__, nested_schema
-                )
-            else:
-                rendered_type = _render_type_str(field.annotation, indent=indent + 1)
-
-            line = f"{next_indent}{name}: {rendered_type},"
-
-            lines.append(line)
-
-        lines.append(f"{current_indent}}}")
-        return "\n".join(lines)
-    except Exception as e:
-        return f"<error building schema for {model.__name__}: {e}>"
-    finally:
-        _seen.discard(model)
+    lines.append(f"{current_indent}}}")
+    return "\n".join(lines)
 
 
 class BAMLAdapter(JSONAdapter):
@@ -183,6 +152,7 @@ class BAMLAdapter(JSONAdapter):
         street: str
         city: str
         country: Literal["US", "CA"]
+
     class PatientDetails(BaseModel):
         name: str = Field(description="Full name of the patient.")
         age: int
@@ -209,71 +179,25 @@ class BAMLAdapter(JSONAdapter):
     ```
     """
 
-    def _get_clean_type_name(self, annotation: Any) -> str:
-        """Extract a clean type name for display in field descriptions."""
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-
-        # Handle Optional[T] or T | None
-        if origin in (types.UnionType, Union):
-            non_none_args = [arg for arg in args if arg is not type(None)]
-            if len(non_none_args) == 1:
-                base_type = self._get_clean_type_name(non_none_args[0])
-                return f"{base_type} or null" if len(non_none_args) < len(args) else base_type
-            return " or ".join(self._get_clean_type_name(arg) for arg in non_none_args) + (
-                " or null" if len(non_none_args) < len(args) else ""
-            )
-
-        # Handle list[T]
-        if origin is list:
-            return f"list[{self._get_clean_type_name(args[0])}]"
-
-        # Handle dict[K, V]
-        if origin is dict:
-            return (
-                f"dict[{self._get_clean_type_name(args[0])}, {self._get_clean_type_name(args[1])}]"
-            )
-
-        # Handle Literal types
-        if origin is Literal:
-            return f"Literal[{', '.join(repr(arg) for arg in args)}]"
-
-        # For classes, return just the class name
-        return getattr(annotation, "__name__", str(annotation))
-
-    def _extract_core_type(self, annotation: Any) -> Any:
-        """Extract the core type from Optional/Union wrappers."""
-        origin = get_origin(annotation)
-        if origin in (types.UnionType, Union):
-            non_none_args = [arg for arg in get_args(annotation) if arg is not type(None)]
-            return non_none_args[0] if len(non_none_args) == 1 else annotation
-        return annotation
-
-    def _get_field_description(self, field) -> str | None:
-        """Extract description from field, filtering out template values."""
-        desc_text = field.description
-        if not desc_text and isinstance(field.json_schema_extra, dict):
-            desc_text = field.json_schema_extra.get("desc")
-            # Skip default template values like ${field_name}
-            if desc_text and desc_text.startswith("${") and desc_text.endswith("}"):
-                desc_text = None
-        return desc_text
-
     def format_field_description(self, signature: type[Signature]) -> str:
         """Format the field description for the system message."""
         sections = []
 
-        for field_type, fields in [
-            ("input", signature.input_fields),
-            ("output", signature.output_fields),
-        ]:
-            if fields:
-                sections.append(f"Your {field_type} fields are:")
-                for i, (name, field) in enumerate(fields.items(), 1):
-                    type_name = self._get_clean_type_name(field.annotation)
-                    desc_text = self._get_field_description(field)
-                    description = f": {desc_text}" if desc_text else ":"
-                    sections.append(f"{i}. `{name}` ({type_name}){description}")
+        # Add input field descriptions
+        if signature.input_fields:
+            sections.append("Your input fields are:")
+            for i, (name, field) in enumerate(signature.input_fields.items(), 1):
+                type_name = getattr(field.annotation, "__name__", str(field.annotation))
+                description = f": {field.description}" if field.description else ":"
+                sections.append(f"{i}. `{name}` ({type_name}){description}")
+
+        # Add output field descriptions
+        if signature.output_fields:
+            sections.append("Your output fields are:")
+            for i, (name, field) in enumerate(signature.output_fields.items(), 1):
+                type_name = getattr(field.annotation, "__name__", str(field.annotation))
+                description = f": {field.description}" if field.description else ":"
+                sections.append(f"{i}. `{name}` ({type_name}){description}")
 
         return "\n".join(sections)
 
@@ -297,16 +221,9 @@ class BAMLAdapter(JSONAdapter):
         # Add output structure section
         if signature.output_fields:
             for name, field in signature.output_fields.items():
+                field_type = field.annotation
                 sections.append(f"[[ ## {name} ## ]]")
-
-                main_type = self._extract_core_type(field.annotation)
-                if inspect.isclass(main_type) and issubclass(main_type, BaseModel):
-                    sections.append(_build_simplified_schema(main_type))
-                else:
-                    type_str = _render_type_str(field.annotation, indent=0)
-                    sections.append(f"Output field `{name}` should be of type: {type_str}")
-
-                sections.append("")  # Empty line after each output
+                sections.append(f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n")
 
         # Add completed section
         sections.append("[[ ## completed ## ]]")
@@ -332,9 +249,7 @@ class BAMLAdapter(JSONAdapter):
                     formatted_value = value.model_dump_json(indent=2, by_alias=True)
                 else:
                     # Fallback to the original dspy formatter for other types
-                    formatted_value = original_format_field_value(
-                        field_info=field_info, value=value
-                    )
+                    formatted_value = original_format_field_value(field_info=field_info, value=value)
 
                 messages.append(f"[[ ## {key} ## ]]\n{formatted_value}")
 
