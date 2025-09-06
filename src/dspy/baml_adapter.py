@@ -4,14 +4,14 @@ Based on the format used by BAML: https://github.com/BoundaryML/baml
 """
 
 import inspect
+import re
 import types
 from typing import Any, Literal, Union, get_args, get_origin
-
-from pydantic import BaseModel
 
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.signatures.signature import Signature
+from pydantic import BaseModel
 
 # Changing the comment symbol to Python's # rather than other languages' // seems to help
 COMMENT_SYMBOL = "#"
@@ -52,7 +52,9 @@ def _render_type_str(
     if origin in (types.UnionType, Union):
         non_none_args = [arg for arg in args if arg is not type(None)]
         # Render the non-None part of the union
-        type_render = " or ".join([_render_type_str(arg, depth + 1, indent) for arg in non_none_args])
+        type_render = " or ".join(
+            [_render_type_str(arg, depth + 1, indent) for arg in non_none_args]
+        )
         # Add "or null" if None was part of the union
         if len(non_none_args) < len(args):
             return f"{type_render} or null"
@@ -100,7 +102,9 @@ def _build_simplified_schema(
     seen_models = seen_models or set()
 
     if pydantic_model in seen_models:
-        raise ValueError("BAMLAdapter cannot handle recursive pydantic models, please use a different adapter.")
+        raise ValueError(
+            "BAMLAdapter cannot handle recursive pydantic models, please use a different adapter."
+        )
 
     # Add `pydantic_model` to `seen_models` with a placeholder value to avoid infinite recursion.
     seen_models.add(pydantic_model)
@@ -121,7 +125,9 @@ def _build_simplified_schema(
             # If there's an alias but no description, show the alias as a comment
             lines.append(f"{next_indent}{COMMENT_SYMBOL} alias: {field.alias}")
 
-        rendered_type = _render_type_str(field.annotation, indent=indent + 1, seen_models=seen_models)
+        rendered_type = _render_type_str(
+            field.annotation, indent=indent + 1, seen_models=seen_models
+        )
         line = f"{next_indent}{name}: {rendered_type},"
 
         lines.append(line)
@@ -179,6 +185,25 @@ class BAMLAdapter(JSONAdapter):
     ```
     """
 
+    def _get_simple_type_name(self, annotation: Any) -> str:
+        """Get a simple type name by cleaning up the string representation."""
+        type_str = str(annotation)
+        # Remove any module prefixes (anything before a dot) and convert to "or null" format
+        # Replace module.ClassName with ClassName
+        type_str = re.sub(r"\b\w+\.(\w+)", r"\1", type_str)
+        # Convert union syntax
+        type_str = type_str.replace(" | ", " or ").replace("None", "null")
+        return type_str
+
+    def _format_single_field_description(
+        self, name: str, field: Any, index: int
+    ) -> str:
+        """Format a single field description line."""
+        simple_type_name = self._get_simple_type_name(field.annotation)
+        type_name = getattr(field.annotation, "__name__", simple_type_name)
+        description = f": {field.description}" if field.description else ":"
+        return f"{index}. `{name}` ({type_name}){description}"
+
     def format_field_description(self, signature: type[Signature]) -> str:
         """Format the field description for the system message."""
         sections = []
@@ -187,17 +212,13 @@ class BAMLAdapter(JSONAdapter):
         if signature.input_fields:
             sections.append("Your input fields are:")
             for i, (name, field) in enumerate(signature.input_fields.items(), 1):
-                type_name = getattr(field.annotation, "__name__", str(field.annotation))
-                description = f": {field.description}" if field.description else ":"
-                sections.append(f"{i}. `{name}` ({type_name}){description}")
+                sections.append(self._format_single_field_description(name, field, i))
 
         # Add output field descriptions
         if signature.output_fields:
             sections.append("Your output fields are:")
             for i, (name, field) in enumerate(signature.output_fields.items(), 1):
-                type_name = getattr(field.annotation, "__name__", str(field.annotation))
-                description = f": {field.description}" if field.description else ":"
-                sections.append(f"{i}. `{name}` ({type_name}){description}")
+                sections.append(self._format_single_field_description(name, field, i))
 
         return "\n".join(sections)
 
@@ -223,7 +244,9 @@ class BAMLAdapter(JSONAdapter):
             for name, field in signature.output_fields.items():
                 field_type = field.annotation
                 sections.append(f"[[ ## {name} ## ]]")
-                sections.append(f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n")
+                sections.append(
+                    f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n"
+                )
 
         # Add completed section
         sections.append("[[ ## completed ## ]]")
@@ -249,7 +272,9 @@ class BAMLAdapter(JSONAdapter):
                     formatted_value = value.model_dump_json(indent=2, by_alias=True)
                 else:
                     # Fallback to the original dspy formatter for other types
-                    formatted_value = original_format_field_value(field_info=field_info, value=value)
+                    formatted_value = original_format_field_value(
+                        field_info=field_info, value=value
+                    )
 
                 messages.append(f"[[ ## {key} ## ]]\n{formatted_value}")
 
