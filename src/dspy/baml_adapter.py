@@ -7,11 +7,10 @@ import inspect
 import types
 from typing import Any, Literal, Union, get_args, get_origin
 
-from pydantic import BaseModel
-
 from dspy.adapters.json_adapter import JSONAdapter
 from dspy.adapters.utils import format_field_value as original_format_field_value
 from dspy.signatures.signature import Signature
+from pydantic import BaseModel
 
 # Changing the comment symbol to Python's # rather than other languages' // seems to help
 COMMENT_SYMBOL = "#"
@@ -52,7 +51,9 @@ def _render_type_str(
     if origin in (types.UnionType, Union):
         non_none_args = [arg for arg in args if arg is not type(None)]
         # Render the non-None part of the union
-        type_render = " or ".join([_render_type_str(arg, depth + 1, indent) for arg in non_none_args])
+        type_render = " or ".join(
+            [_render_type_str(arg, depth + 1, indent) for arg in non_none_args]
+        )
         # Add "or null" if None was part of the union
         if len(non_none_args) < len(args):
             return f"{type_render} or null"
@@ -100,7 +101,9 @@ def _build_simplified_schema(
     seen_models = seen_models or set()
 
     if pydantic_model in seen_models:
-        raise ValueError("BAMLAdapter cannot handle recursive pydantic models, please use a different adapter.")
+        raise ValueError(
+            "BAMLAdapter cannot handle recursive pydantic models, please use a different adapter."
+        )
 
     # Add `pydantic_model` to `seen_models` with a placeholder value to avoid infinite recursion.
     seen_models.add(pydantic_model)
@@ -121,7 +124,9 @@ def _build_simplified_schema(
             # If there's an alias but no description, show the alias as a comment
             lines.append(f"{next_indent}{COMMENT_SYMBOL} alias: {field.alias}")
 
-        rendered_type = _render_type_str(field.annotation, indent=indent + 1, seen_models=seen_models)
+        rendered_type = _render_type_str(
+            field.annotation, indent=indent + 1, seen_models=seen_models
+        )
         line = f"{next_indent}{name}: {rendered_type},"
 
         lines.append(line)
@@ -178,29 +183,6 @@ class BAMLAdapter(JSONAdapter):
     # PatientDetails(name='John Doe', age=45, address=PatientAddress(street='123 Main St', city='Anytown', country='US'))
     ```
     """
-
-    def format_field_description(self, signature: type[Signature]) -> str:
-        """Format the field description for the system message."""
-        sections = []
-
-        # Add input field descriptions
-        if signature.input_fields:
-            sections.append("Your input fields are:")
-            for i, (name, field) in enumerate(signature.input_fields.items(), 1):
-                type_name = getattr(field.annotation, "__name__", str(field.annotation))
-                description = f": {field.description}" if field.description else ":"
-                sections.append(f"{i}. `{name}` ({type_name}){description}")
-
-        # Add output field descriptions
-        if signature.output_fields:
-            sections.append("Your output fields are:")
-            for i, (name, field) in enumerate(signature.output_fields.items(), 1):
-                type_name = getattr(field.annotation, "__name__", str(field.annotation))
-                description = f": {field.description}" if field.description else ":"
-                sections.append(f"{i}. `{name}` ({type_name}){description}")
-
-        return "\n".join(sections)
-
     def format_field_structure(self, signature: type[Signature]) -> str:
         """Overrides the base method to generate a simplified schema for Pydantic models."""
 
@@ -223,7 +205,9 @@ class BAMLAdapter(JSONAdapter):
             for name, field in signature.output_fields.items():
                 field_type = field.annotation
                 sections.append(f"[[ ## {name} ## ]]")
-                sections.append(f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n")
+                sections.append(
+                    f"Output field `{name}` should be of type: {_render_type_str(field_type, indent=0)}\n"
+                )
 
         # Add completed section
         sections.append("[[ ## completed ## ]]")
@@ -249,7 +233,9 @@ class BAMLAdapter(JSONAdapter):
                     formatted_value = value.model_dump_json(indent=2, by_alias=True)
                 else:
                     # Fallback to the original dspy formatter for other types
-                    formatted_value = original_format_field_value(field_info=field_info, value=value)
+                    formatted_value = original_format_field_value(
+                        field_info=field_info, value=value
+                    )
 
                 messages.append(f"[[ ## {key} ## ]]\n{formatted_value}")
 
