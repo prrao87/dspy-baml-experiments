@@ -4,7 +4,6 @@ Based on the format used by BAML: https://github.com/BoundaryML/baml
 """
 
 import inspect
-import re
 import types
 from typing import Any, Literal, Union, get_args, get_origin
 
@@ -184,44 +183,6 @@ class BAMLAdapter(JSONAdapter):
     # PatientDetails(name='John Doe', age=45, address=PatientAddress(street='123 Main St', city='Anytown', country='US'))
     ```
     """
-
-    def _get_simple_type_name(self, annotation: Any) -> str:
-        """Get a simple type name by cleaning up the string representation."""
-        type_str = str(annotation)
-        # Remove any module prefixes (anything before a dot) and convert to "or null" format
-        # Replace module.ClassName with ClassName
-        type_str = re.sub(r"\b\w+\.(\w+)", r"\1", type_str)
-        # Convert union syntax
-        type_str = type_str.replace(" | ", " or ").replace("None", "null")
-        return type_str
-
-    def _format_single_field_description(
-        self, name: str, field: Any, index: int
-    ) -> str:
-        """Format a single field description line."""
-        simple_type_name = self._get_simple_type_name(field.annotation)
-        type_name = getattr(field.annotation, "__name__", simple_type_name)
-        description = f": {field.description}" if field.description else ":"
-        return f"{index}. `{name}` ({type_name}){description}"
-
-    def format_field_description(self, signature: type[Signature]) -> str:
-        """Format the field description for the system message."""
-        sections = []
-
-        # Add input field descriptions
-        if signature.input_fields:
-            sections.append("Your input fields are:")
-            for i, (name, field) in enumerate(signature.input_fields.items(), 1):
-                sections.append(self._format_single_field_description(name, field, i))
-
-        # Add output field descriptions
-        if signature.output_fields:
-            sections.append("Your output fields are:")
-            for i, (name, field) in enumerate(signature.output_fields.items(), 1):
-                sections.append(self._format_single_field_description(name, field, i))
-
-        return "\n".join(sections)
-
     def format_field_structure(self, signature: type[Signature]) -> str:
         """Overrides the base method to generate a simplified schema for Pydantic models."""
 
