@@ -39,6 +39,9 @@ def _render_type_str(
     if annotation is bool:
         return "boolean"
     if inspect.isclass(annotation) and issubclass(annotation, BaseModel):
+        # Initialize seen_models if not provided
+        if seen_models is None:
+            seen_models = set()
         return _build_simplified_schema(annotation, indent, seen_models)
 
     try:
@@ -52,7 +55,10 @@ def _render_type_str(
         non_none_args = [arg for arg in args if arg is not type(None)]
         # Render the non-None part of the union
         type_render = " or ".join(
-            [_render_type_str(arg, depth + 1, indent) for arg in non_none_args]
+            [
+                _render_type_str(arg, depth + 1, indent, seen_models)
+                for arg in non_none_args
+            ]
         )
         # Add "or null" if None was part of the union
         if len(non_none_args) < len(args):
@@ -69,16 +75,18 @@ def _render_type_str(
         inner_type = args[0]
         if inspect.isclass(inner_type) and issubclass(inner_type, BaseModel):
             # Build inner schema - the Pydantic model inside should use indent level for array contents
+            if seen_models is None:
+                seen_models = set()
             inner_schema = _build_simplified_schema(inner_type, indent + 1, seen_models)
             # Format with proper bracket notation and indentation
             current_indent = "  " * indent
             return f"[\n{inner_schema}\n{current_indent}]"
         else:
-            return f"{_render_type_str(inner_type, depth + 1, indent)}[]"
+            return f"{_render_type_str(inner_type, depth + 1, indent, seen_models)}[]"
 
     # dict[T1, T2]
     if origin is dict:
-        return f"dict[{_render_type_str(args[0], depth + 1, indent)}, {_render_type_str(args[1], depth + 1, indent)}]"
+        return f"dict[{_render_type_str(args[0], depth + 1, indent, seen_models)}, {_render_type_str(args[1], depth + 1, indent, seen_models)}]"
 
     # fallback
     if hasattr(annotation, "__name__"):
@@ -101,9 +109,8 @@ def _build_simplified_schema(
     seen_models = seen_models or set()
 
     if pydantic_model in seen_models:
-        raise ValueError(
-            "BAMLAdapter cannot handle recursive pydantic models, please use a different adapter."
-        )
+        # Return a reference to the already processed model
+        return f"{pydantic_model.__name__} (recursive reference)"
 
     # Add `pydantic_model` to `seen_models` with a placeholder value to avoid infinite recursion.
     seen_models.add(pydantic_model)
@@ -183,6 +190,7 @@ class BAMLAdapter(JSONAdapter):
     # PatientDetails(name='John Doe', age=45, address=PatientAddress(street='123 Main St', city='Anytown', country='US'))
     ```
     """
+
     def format_field_structure(self, signature: type[Signature]) -> str:
         """Overrides the base method to generate a simplified schema for Pydantic models."""
 
