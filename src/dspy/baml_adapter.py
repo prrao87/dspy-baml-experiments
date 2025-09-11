@@ -55,10 +55,7 @@ def _render_type_str(
         non_none_args = [arg for arg in args if arg is not type(None)]
         # Render the non-None part of the union
         type_render = " or ".join(
-            [
-                _render_type_str(arg, depth + 1, indent, seen_models)
-                for arg in non_none_args
-            ]
+            [_render_type_str(arg, depth + 1, indent, seen_models) for arg in non_none_args]
         )
         # Add "or null" if None was part of the union
         if len(non_none_args) < len(args):
